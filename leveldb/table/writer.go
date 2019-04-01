@@ -7,6 +7,8 @@
 package table
 
 import (
+	"compress/flate"
+	"compress/zlib"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -14,10 +16,10 @@ import (
 
 	"github.com/golang/snappy"
 
-	"github.com/syndtr/goleveldb/leveldb/comparer"
-	"github.com/syndtr/goleveldb/leveldb/filter"
-	"github.com/syndtr/goleveldb/leveldb/opt"
-	"github.com/syndtr/goleveldb/leveldb/util"
+	"github.com/beito123/goleveldb/leveldb/comparer"
+	"github.com/beito123/goleveldb/leveldb/filter"
+	"github.com/beito123/goleveldb/leveldb/opt"
+	"github.com/beito123/goleveldb/leveldb/util"
 )
 
 func sharedPrefixLen(a, b []byte) int {
@@ -162,7 +164,8 @@ type Writer struct {
 func (w *Writer) writeBlock(buf *util.Buffer, compression opt.Compression) (bh blockHandle, err error) {
 	// Compress the buffer if necessary.
 	var b []byte
-	if compression == opt.SnappyCompression {
+	switch compression {
+	case opt.SnappyCompression:
 		// Allocate scratch enough for compression and block trailer.
 		if n := snappy.MaxEncodedLen(buf.Len()) + blockTrailerLen; len(w.compressionScratch) < n {
 			w.compressionScratch = make([]byte, n)
@@ -171,7 +174,42 @@ func (w *Writer) writeBlock(buf *util.Buffer, compression opt.Compression) (bh b
 		n := len(compressed)
 		b = compressed[:n+blockTrailerLen]
 		b[n] = blockTypeSnappyCompression
-	} else {
+	case opt.ZlibCompression:
+		stream := util.NewBuffer([]byte{})
+		writer := zlib.NewWriter(stream)
+
+		_, err = writer.Write(buf.Bytes())
+		if err != nil {
+			writer.Close()
+			return
+		}
+
+		writer.Flush()
+		writer.Close()
+
+		tmp := stream.Alloc(blockTrailerLen)
+		tmp[0] = blockTypeZlibCompression
+		b = stream.Bytes()
+	case opt.ZlibRawCompression:
+		stream := util.NewBuffer([]byte{})
+		var writer *flate.Writer
+		writer, err = flate.NewWriter(stream, flate.DefaultCompression)
+		if err != nil {
+			return
+		}
+
+		_, err = writer.Write(buf.Bytes())
+		if err != nil {
+			writer.Close()
+			return
+		}
+
+		writer.Close()
+
+		tmp := stream.Alloc(blockTrailerLen)
+		tmp[0] = blockTypeZlibRawCompression
+		b = stream.Bytes()
+	default:
 		tmp := buf.Alloc(blockTrailerLen)
 		tmp[0] = blockTypeNoCompression
 		b = buf.Bytes()
@@ -179,6 +217,7 @@ func (w *Writer) writeBlock(buf *util.Buffer, compression opt.Compression) (bh b
 
 	// Calculate the checksum.
 	n := len(b) - 4
+
 	checksum := util.NewCRC(b[:n]).Value()
 	binary.LittleEndian.PutUint32(b[n:], checksum)
 

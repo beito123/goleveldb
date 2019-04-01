@@ -10,9 +10,9 @@ package opt
 import (
 	"math"
 
-	"github.com/syndtr/goleveldb/leveldb/cache"
-	"github.com/syndtr/goleveldb/leveldb/comparer"
-	"github.com/syndtr/goleveldb/leveldb/filter"
+	"github.com/beito123/goleveldb/leveldb/cache"
+	"github.com/beito123/goleveldb/leveldb/comparer"
+	"github.com/beito123/goleveldb/leveldb/filter"
 )
 
 const (
@@ -80,6 +80,10 @@ func (c Compression) String() string {
 		return "none"
 	case SnappyCompression:
 		return "snappy"
+	case ZlibCompression:
+		return "zlib"
+	case ZlibRawCompression:
+		return "zlib-raw"
 	}
 	return "invalid"
 }
@@ -88,6 +92,8 @@ const (
 	DefaultCompression Compression = iota
 	NoCompression
 	SnappyCompression
+	ZlibCompression
+	ZlibRawCompression
 	nCompression
 )
 

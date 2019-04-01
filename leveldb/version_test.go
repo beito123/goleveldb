@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
-	"github.com/syndtr/goleveldb/leveldb/storage"
-	"github.com/syndtr/goleveldb/leveldb/testutil"
+	"github.com/beito123/goleveldb/leveldb/storage"
+	"github.com/beito123/goleveldb/leveldb/testutil"
 )
 
 type testFileRec struct {

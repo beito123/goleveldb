@@ -7,23 +7,27 @@
 package table
 
 import (
+	"bytes"
+	"compress/flate"
+	"compress/zlib"
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"sort"
 	"strings"
 	"sync"
 
 	"github.com/golang/snappy"
 
-	"github.com/syndtr/goleveldb/leveldb/cache"
-	"github.com/syndtr/goleveldb/leveldb/comparer"
-	"github.com/syndtr/goleveldb/leveldb/errors"
-	"github.com/syndtr/goleveldb/leveldb/filter"
-	"github.com/syndtr/goleveldb/leveldb/iterator"
-	"github.com/syndtr/goleveldb/leveldb/opt"
-	"github.com/syndtr/goleveldb/leveldb/storage"
-	"github.com/syndtr/goleveldb/leveldb/util"
+	"github.com/beito123/goleveldb/leveldb/cache"
+	"github.com/beito123/goleveldb/leveldb/comparer"
+	"github.com/beito123/goleveldb/leveldb/errors"
+	"github.com/beito123/goleveldb/leveldb/filter"
+	"github.com/beito123/goleveldb/leveldb/iterator"
+	"github.com/beito123/goleveldb/leveldb/opt"
+	"github.com/beito123/goleveldb/leveldb/storage"
+	"github.com/beito123/goleveldb/leveldb/util"
 )
 
 // Reader errors.
@@ -591,6 +595,37 @@ func (r *Reader) readRawBlock(bh blockHandle, verifyChecksum bool) ([]byte, erro
 			r.bpool.Put(decData)
 			return nil, r.newErrCorruptedBH(bh, err.Error())
 		}
+		data = decData
+	case blockTypeZlibCompression:
+		decoder, err := zlib.NewReader(bytes.NewBuffer(data[:bh.length]))
+		if err != nil {
+			r.bpool.Put(data)
+			return nil, r.newErrCorruptedBH(bh, err.Error())
+		}
+
+		defer decoder.Close()
+
+		decData := r.bpool.Get(len(data[:bh.length]))
+		decData, err = ioutil.ReadAll(decoder)
+		r.bpool.Put(data)
+		if err != nil {
+			r.bpool.Put(decData)
+			return nil, r.newErrCorruptedBH(bh, err.Error())
+		}
+
+		data = decData
+	case blockTypeZlibRawCompression:
+		decoder := flate.NewReader(bytes.NewBuffer(data[:bh.length]))
+		defer decoder.Close()
+
+		decData := r.bpool.Get(len(data[:bh.length]))
+		decData, err := ioutil.ReadAll(decoder)
+		r.bpool.Put(data)
+		if err != nil {
+			r.bpool.Put(decData)
+			return nil, r.newErrCorruptedBH(bh, err.Error())
+		}
+
 		data = decData
 	default:
 		r.bpool.Put(data)

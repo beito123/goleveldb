@@ -149,8 +149,10 @@ const (
 
 	// The block type gives the per-block compression format.
 	// These constants are part of the file format and should not be changed.
-	blockTypeNoCompression     = 0
-	blockTypeSnappyCompression = 1
+	blockTypeNoCompression      = 0
+	blockTypeSnappyCompression  = 1
+	blockTypeZlibCompression    = 2
+	blockTypeZlibRawCompression = 4
 
 	// Generate new filter every 2KB of data
 	filterBaseLg = 11
